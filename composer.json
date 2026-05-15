@@ -1,0 +1,36 @@
+{
+    "name": "ephpm/cache-symfony",
+    "description": "Symfony Cache adapter that stores items in ePHPm's in-process KV store via the ephpm_kv_* SAPI functions — zero socket round-trips.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["symfony", "cache", "psr-6", "ephpm", "kv", "sapi"],
+    "homepage": "https://ephpm.dev",
+    "support": {
+        "issues": "https://github.com/ephpm/cache-symfony/issues",
+        "source": "https://github.com/ephpm/cache-symfony"
+    },
+    "require": {
+        "php": "^8.2",
+        "symfony/cache": "^6.4 || ^7.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5 || ^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Ephpm\\Cache\\Symfony\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Ephpm\\Cache\\Symfony\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "minimum-stability": "stable"
+}
