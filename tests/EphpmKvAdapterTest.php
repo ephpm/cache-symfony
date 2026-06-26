@@ -251,7 +251,20 @@ final class EphpmKvAdapterTest extends TestCase
 
         $ops->set($storageKey, 'this is not a serialized payload');
 
-        $missed = $adapter->getItem('corrupt');
+        // Symfony's DefaultMarshaller routes through igbinary first when
+        // the extension is loaded (it is, in CI). igbinary emits a PHP
+        // warning on a bogus header before returning false, and PHPUnit's
+        // failOnWarning would fail this otherwise-passing assertion.
+        // Catch only the unmarshall warning so a real bug elsewhere still
+        // surfaces.
+        $missed = null;
+        \set_error_handler(static fn () => true, \E_WARNING);
+        try {
+            $missed = $adapter->getItem('corrupt');
+        } finally {
+            \restore_error_handler();
+        }
+        self::assertNotNull($missed);
         self::assertFalse($missed->isHit());
     }
 }
