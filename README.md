@@ -67,7 +67,9 @@ single C function call per `get`/`set` is the upside.
 
 - **PHP 8.2+**
 - **`symfony/cache` ^6.4 || ^7.0** (Composer pulls this in automatically)
-- **The ePHPm runtime** — the global `ephpm_kv_*` SAPI functions are
+- **The ePHPm runtime** — any tagged release works (every `ephpm_kv_*`
+  SAPI function this adapter calls has shipped since ePHPm v0.1.0;
+  current release: v0.8.6). The functions are
   registered by ePHPm's embedded PHP. If you're running your code under
   PHP-FPM, Apache mod_php, or the stock PHP CLI, those functions don't
   exist and `SapiKvOps::__construct()` throws on instantiation. For
@@ -87,8 +89,14 @@ refuse to construct.
 
 ## Install
 
+ePHPm packages are distributed via their GitHub repositories, not
+Packagist. Add this repo as a Composer `vcs` repository, then require
+the package (`ephpm/cache-symfony` is tagged `v0.1.0`, so `^0.1`
+resolves):
+
 ```bash
-composer require ephpm/cache-symfony
+composer config repositories.ephpm/cache-symfony vcs https://github.com/ephpm/cache-symfony
+composer require ephpm/cache-symfony:^0.1
 ```
 
 That's it. Composer pulls in `symfony/cache` if you don't already have it.
@@ -98,7 +106,8 @@ If you're starting a brand-new project from scratch:
 ```bash
 mkdir my-app && cd my-app
 composer init --no-interaction --name=acme/my-app --require=php:^8.2
-composer require ephpm/cache-symfony
+composer config repositories.ephpm/cache-symfony vcs https://github.com/ephpm/cache-symfony
+composer require ephpm/cache-symfony:^0.1
 ```
 
 ---
@@ -125,12 +134,12 @@ my-app/
 ```json
 {
     "name": "acme/my-app",
+    "repositories": [
+        { "type": "vcs", "url": "https://github.com/ephpm/cache-symfony" }
+    ],
     "require": {
         "php": "^8.2",
         "ephpm/cache-symfony": "^0.1"
-    },
-    "autoload": {
-        "files": ["vendor/autoload.php"]
     }
 }
 ```
