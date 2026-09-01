@@ -344,7 +344,7 @@ If this passes you've confirmed:
 | `save` / `saveDeferred` / `commit`               | Supported. TTL respects `$item->expiresAfter()` / `expiresAt()`, falling back to the adapter's `defaultLifetime`. |
 | `deleteItem` / `deleteItems`                     | Supported.                                                              |
 | `get($key, $callback)` (Contracts)               | Supported (including stampede protection via `LockRegistry`).           |
-| `clear()`                                        | **Returns `false`** — see Limitations.                                  |
+| `clear()`                                        | **Un-namespaced adapter only**: flushes the whole store via `ephpm_kv_flush_all()` (ePHPm v0.1.2+). With a namespace it returns `false` — see Limitations. |
 | Tagging (`TagAwareAdapterInterface`)             | Not implemented.                                                        |
 | Marshalling                                      | `Symfony\Component\Cache\Marshaller\DefaultMarshaller` (igbinary when available, native serialize otherwise). Inject your own `MarshallerInterface` via the constructor to override. |
 
@@ -352,11 +352,16 @@ If this passes you've confirmed:
 
 ## Limitations
 
-**`clear()` is a no-op (returns `false`).**
+**`clear()` on a namespaced adapter is a no-op (returns `false`).**
 The ePHPm KV SAPI doesn't expose key enumeration — there's no `SCAN`, no
-`KEYS`, no namespace-prefix iteration. The recommended invalidation
-pattern is **namespace versioning**: bump the namespace string when you
-need to wipe everything.
+`KEYS`, no namespace-prefix iteration — so a namespace-scoped clear
+cannot delete just its own keys. An **un-namespaced** adapter
+(`new EphpmKvAdapter('')`) falls back to a global
+`ephpm_kv_flush_all()` (ePHPm v0.1.2+), the same contract as
+`RedisAdapter`'s `FLUSHDB` fallback — note that flushes *everything* in
+the effective store, not just cache entries. For namespaced pools the
+recommended invalidation pattern is **namespace versioning**: bump the
+namespace string when you need to wipe everything.
 
 ```php
 // Old keys still exist in the KV store but are no longer reachable
@@ -415,8 +420,11 @@ the third arg of `EphpmKvAdapter` (tests).
 
 ### Cache items are mysteriously gone
 
-You're calling `clear()` and expecting it to nuke the pool. It doesn't —
-`clear()` returns `false` because the SAPI has no `SCAN`. Switch to
+You're calling `clear()` on a **namespaced** adapter and expecting it to
+nuke the pool. It doesn't — a namespaced `clear()` returns `false`
+because the SAPI has no `SCAN` to delete by prefix. Either use an
+un-namespaced adapter (whose `clear()` flushes the whole store via
+`ephpm_kv_flush_all()`), or switch to
 **namespace versioning**: change the namespace string passed to
 `EphpmKvAdapter::__construct()` (e.g. `'app.v1'` → `'app.v2'`) and the
 old keys become unreachable through the new pool. They'll expire on
