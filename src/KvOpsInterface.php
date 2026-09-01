@@ -72,4 +72,10 @@ interface KvOpsInterface
      * -2 if the key does not exist, otherwise the ms remaining.
      */
     public function pttl(string $key): int;
+
+    /**
+     * Remove every key from the effective store. Backed by ephpm_kv_flush_all()
+     * (ePHPm v0.1.2+); a no-op returning false on older runtimes.
+     */
+    public function flush(): bool;
 }

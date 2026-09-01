@@ -107,22 +107,60 @@ final class EphpmKvAdapterTest extends TestCase
         self::assertFalse($adapter->hasItem('doomed'));
     }
 
-    public function test_clear_returns_false_and_is_a_noop(): void
+    public function test_clear_flushes_when_adapter_has_no_namespace(): void
     {
         $ops = new InMemoryKvOps();
         $adapter = new EphpmKvAdapter('', 0, $ops);
+
+        $a = $adapter->getItem('a');
+        $a->set('alpha');
+        $adapter->save($a);
+        $b = $adapter->getItem('b');
+        $b->set('beta');
+        $adapter->save($b);
+
+        // Un-namespaced adapter falls back to ephpm_kv_flush_all() — the
+        // same contract Symfony's RedisAdapter uses when no namespace is
+        // configured (FLUSHDB).
+        self::assertTrue($adapter->clear());
+        self::assertFalse($adapter->getItem('a')->isHit());
+        self::assertFalse($adapter->getItem('b')->isHit());
+    }
+
+    public function test_clear_is_noop_when_adapter_has_namespace(): void
+    {
+        $ops = new InMemoryKvOps();
+        $adapter = new EphpmKvAdapter('app.v1', 0, $ops);
 
         $item = $adapter->getItem('keep-me');
         $item->set('still-here');
         $adapter->save($item);
 
-        // clear() returning false is the documented contract — the SAPI
-        // has no SCAN, so wholesale invalidation has to come from
-        // namespace versioning instead.
+        // A namespaced clear would need SCAN to avoid nuking other
+        // adapters' keys. Without SCAN we refuse: callers bump the
+        // namespace ('app.v1' -> 'app.v2') instead.
         self::assertFalse($adapter->clear());
-
-        // The previously stored key is still present.
         self::assertTrue($adapter->getItem('keep-me')->isHit());
+    }
+
+    public function test_clear_with_namespace_does_not_disturb_other_namespaces(): void
+    {
+        $ops = new InMemoryKvOps();
+        $appA = new EphpmKvAdapter('app.a', 0, $ops);
+        $appB = new EphpmKvAdapter('app.b', 0, $ops);
+
+        $itemA = $appA->getItem('x');
+        $itemA->set('from-a');
+        $appA->save($itemA);
+        $itemB = $appB->getItem('x');
+        $itemB->set('from-b');
+        $appB->save($itemB);
+
+        self::assertFalse($appA->clear());
+        // Both still present — the namespaced clear was a no-op, so
+        // neither namespace lost data.
+        self::assertSame('from-a', $appA->getItem('x')->get());
+        self::assertSame('from-b', $appB->getItem('x')->get());
     }
 
     public function test_default_lifetime_applies_when_item_lifetime_not_set(): void
@@ -213,7 +251,20 @@ final class EphpmKvAdapterTest extends TestCase
 
         $ops->set($storageKey, 'this is not a serialized payload');
 
-        $missed = $adapter->getItem('corrupt');
+        // Symfony's DefaultMarshaller routes through igbinary first when
+        // the extension is loaded (it is, in CI). igbinary emits a PHP
+        // warning on a bogus header before returning false, and PHPUnit's
+        // failOnWarning would fail this otherwise-passing assertion.
+        // Catch only the unmarshall warning so a real bug elsewhere still
+        // surfaces.
+        $missed = null;
+        \set_error_handler(static fn () => true, \E_WARNING);
+        try {
+            $missed = $adapter->getItem('corrupt');
+        } finally {
+            \restore_error_handler();
+        }
+        self::assertNotNull($missed);
         self::assertFalse($missed->isHit());
     }
 }

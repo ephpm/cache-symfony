@@ -22,10 +22,13 @@ use Symfony\Component\Cache\Marshaller\MarshallerInterface;
  * `false`-on-unmarshall-failure handling) as `RedisAdapter`.
  *
  * Limitations:
- *  - `clear()` always returns false. The SAPI does not expose key
- *    enumeration (no SCAN), so we cannot delete by namespace prefix.
- *    Use a versioned namespace (`new EphpmKvAdapter('app.v2')`) when you
- *    need to invalidate everything at once.
+ *  - `clear()` only works on an un-namespaced adapter. With a namespace,
+ *    it returns `false`: the SAPI exposes no key enumeration (no SCAN),
+ *    so we can't delete by prefix without nuking other namespaces — the
+ *    safer choice is to leave the keys and let callers use namespace
+ *    versioning (`new EphpmKvAdapter('app.v2')`). An un-namespaced
+ *    adapter uses `ephpm_kv_flush_all()` (ePHPm v0.1.2+), matching how
+ *    `RedisAdapter` falls back to `FLUSHDB` when no namespace is set.
  *  - No tagging support (no `TagAwareAdapterInterface`).
  *  - `LockRegistry` cache-stampede protection works because it relies
  *    on read/write of single keys, but anything that needs key
@@ -90,10 +93,15 @@ final class EphpmKvAdapter extends AbstractAdapter
 
     protected function doClear(string $namespace): bool
     {
-        // The SAPI doesn't expose key enumeration (no SCAN), so we can't
-        // delete by prefix. Return false so callers know clear() was a
-        // no-op; the recommended invalidation pattern is namespace
-        // versioning. See README "Limitations".
-        return false;
+        // Without SCAN we still can't enumerate keys by prefix, so a
+        // namespace-scoped clear is impossible — it would either nuke
+        // unrelated adapters (flush_all) or no-op silently. Match
+        // RedisAdapter: when the adapter has no namespace, fall back to
+        // a global flush (here: ephpm_kv_flush_all() via ops->flush());
+        // otherwise return false and rely on namespace versioning.
+        if ($namespace !== '') {
+            return false;
+        }
+        return $this->ops->flush();
     }
 }
