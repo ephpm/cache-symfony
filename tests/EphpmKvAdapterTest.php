@@ -215,6 +215,45 @@ final class EphpmKvAdapterTest extends TestCase
         self::assertFalse($adapter->hasItem('lifecycle'));
     }
 
+    public function test_save_reports_failure_when_backend_set_fails(): void
+    {
+        // Regression: doSave() ignored set()'s return value and always
+        // returned true, so an OOM-dropped write (set() === false) looked
+        // like a successful save. AbstractAdapter::save() must surface that
+        // as false.
+        $adapter = new EphpmKvAdapter('', 0, new FailingSetKvOps(failAll: true));
+
+        $item = $adapter->getItem('doomed');
+        $item->set('value-that-cannot-be-stored');
+
+        self::assertFalse($adapter->save($item));
+    }
+
+    public function test_do_save_returns_list_of_failed_ids(): void
+    {
+        // Drive doSave() directly with several values so we can assert it
+        // returns exactly the ids it failed to persist (the AbstractAdapter
+        // doSave contract), not a bare true.
+        $adapter = new EphpmKvAdapter('', 0, new FailingSetKvOps(failAll: true));
+
+        $doSave = (new \ReflectionClass($adapter))->getMethod('doSave');
+
+        $values = ['a' => 'one', 'b' => 'two', 'c' => 'three'];
+        $result = $doSave->invoke($adapter, $values, 0);
+
+        self::assertIsArray($result);
+        self::assertSame(['a', 'b', 'c'], $result);
+    }
+
+    public function test_do_save_returns_true_when_all_sets_succeed(): void
+    {
+        $adapter = new EphpmKvAdapter('', 0, new InMemoryKvOps());
+
+        $doSave = (new \ReflectionClass($adapter))->getMethod('doSave');
+
+        self::assertTrue($doSave->invoke($adapter, ['a' => 'one', 'b' => 'two'], 0));
+    }
+
     public function test_unmarshall_failure_is_treated_as_miss(): void
     {
         // Drop a value that wasn't produced by the marshaller, so
@@ -246,7 +285,6 @@ final class EphpmKvAdapterTest extends TestCase
         // garbage at the same logical id via an internal probe.
         $reflection = new \ReflectionClass($adapter);
         $getId = $reflection->getMethod('getId');
-        $getId->setAccessible(true);
         $storageKey = $getId->invoke($adapter, 'corrupt');
 
         $ops->set($storageKey, 'this is not a serialized payload');

@@ -69,7 +69,7 @@ single C function call per `get`/`set` is the upside.
 - **`symfony/cache` ^6.4 || ^7.0** (Composer pulls this in automatically)
 - **The ePHPm runtime** — any tagged release works (every `ephpm_kv_*`
   SAPI function this adapter calls has shipped since ePHPm v0.1.0;
-  current release: v0.8.6). The functions are
+  current release: v0.10.2). The functions are
   registered by ePHPm's embedded PHP. If you're running your code under
   PHP-FPM, Apache mod_php, or the stock PHP CLI, those functions don't
   exist and `SapiKvOps::__construct()` throws on instantiation. For
