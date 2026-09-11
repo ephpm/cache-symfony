@@ -14,7 +14,6 @@
         "symfony/cache": "^6.4 || ^7.0"
     },
     "require-dev": {
-        "cache/integration-tests": "^1.0.3",
         "phpunit/phpunit": "^10.5 || ^11.0"
     },
     "autoload": {
@@ -24,18 +23,11 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Ephpm\\Cache\\Symfony\\Tests\\": "tests/",
-            "Symfony\\Component\\Cache\\Tests\\": "vendor/symfony/cache/Tests/"
+            "Ephpm\\Cache\\Symfony\\Tests\\": "tests/"
         }
     },
     "config": {
-        "sort-packages": true,
-        "preferred-install": {
-            "symfony/cache": "source"
-        }
-    },
-    "scripts": {
-        "test": "@php -d zend.assertions=1 vendor/bin/phpunit"
+        "sort-packages": true
     },
     "minimum-stability": "stable"
 }
