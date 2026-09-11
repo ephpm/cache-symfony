@@ -86,7 +86,13 @@ final class EphpmKvAdapter extends AbstractAdapter
         $failed = [];
         $serialized = $this->marshaller->marshall($values, $failed);
         foreach ($serialized as $id => $value) {
-            $this->ops->set($id, $value, $lifetime);
+            // set() returns false only on a genuine store failure (OOM under
+            // noeviction). AbstractAdapter::doSave's contract is to return the
+            // list of ids that could not be persisted, so a false here must be
+            // reported — otherwise a dropped write looks like a successful save.
+            if (!$this->ops->set($id, $value, $lifetime)) {
+                $failed[] = $id;
+            }
         }
         return $failed ?: true;
     }

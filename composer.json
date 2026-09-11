@@ -29,8 +29,5 @@
     "config": {
         "sort-packages": true
     },
-    "scripts": {
-        "test": "phpunit"
-    },
     "minimum-stability": "stable"
 }
