@@ -92,6 +92,20 @@ namespace {
 
             return true;
         }
+
+        function ephpm_kv_mget(array $keys): array|false
+        {
+            return \array_map(static fn ($k) => FakeSapiState::$store[$k] ?? null, \array_values($keys));
+        }
+
+        function ephpm_kv_mset(array $values, int $ttl = 0): bool
+        {
+            foreach ($values as $k => $v) {
+                FakeSapiState::$store[(string) $k] = (string) $v;
+            }
+
+            return true;
+        }
     }
 }
 
@@ -128,6 +142,22 @@ namespace Ephpm\Cache\Symfony\Tests {
             $this->expectException(\RuntimeException::class);
             $this->expectExceptionMessage('stored value is not an integer');
             $ops->incrBy('label', 1);
+        }
+
+        public function test_supports_tracks_which_functions_exist(): void
+        {
+            $ops = new SapiKvOps();
+            self::assertTrue($ops->supports('mget'));
+            self::assertTrue($ops->supports('mset'));
+            self::assertFalse($ops->supports('get'));
+            self::assertFalse($ops->supports('scan'));
+        }
+
+        public function test_mget_and_mset_pass_through(): void
+        {
+            $ops = new SapiKvOps();
+            self::assertTrue($ops->mset(['a' => '1', 'b' => '2']));
+            self::assertSame(['1', null, '2'], $ops->mget(['a', 'zz', 'b']));
         }
     }
 }

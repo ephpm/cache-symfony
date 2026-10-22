@@ -136,9 +136,9 @@ final class EphpmKvAdapterTest extends TestCase
         $item->set('still-here');
         $adapter->save($item);
 
-        // A namespaced clear would need SCAN to avoid nuking other
-        // adapters' keys. Without SCAN we refuse: callers bump the
-        // namespace ('app.v1' -> 'app.v2') instead.
+        // A namespaced clear would need key enumeration to avoid nuking
+        // other adapters' keys, and ephpm_kv_scan is not cluster-complete,
+        // so we refuse: callers bump the namespace ('app.v1' -> 'app.v2').
         self::assertFalse($adapter->clear());
         self::assertTrue($adapter->getItem('keep-me')->isHit());
     }
