@@ -12,14 +12,53 @@ namespace Ephpm\Cache\Symfony;
  * TTL semantics match the SAPI: TTLs are stored as monotonic deadlines
  * in milliseconds; lazy expiry (a key is only "gone" when it's looked up
  * after its deadline). No background sweeper.
+ *
+ * Also implements the multi-key operations ({@see ExtendedKvOpsInterface}).
+ * Pass a list of operation names to the constructor to emulate an older
+ * ePHPm — `[]` behaves like a runtime without `ephpm_kv_mget`/`mset`.
  */
-final class InMemoryKvOps implements KvOpsInterface
+final class InMemoryKvOps implements ExtendedKvOpsInterface
 {
     /** @var array<string, string> */
     private array $values = [];
 
     /** @var array<string, int> deadline in milliseconds since epoch */
     private array $deadlines = [];
+
+    /** @var list<string> */
+    private array $ops;
+
+    /**
+     * @param list<string>|null $ops operations to report as available (see
+     *                               {@see ExtendedKvOpsInterface::OPS});
+     *                               null = all of them
+     */
+    public function __construct(?array $ops = null)
+    {
+        $this->ops = $ops ?? self::OPS;
+    }
+
+    public function supports(string $op): bool
+    {
+        return \in_array($op, $this->ops, true);
+    }
+
+    public function mget(array $keys): array|false
+    {
+        $out = [];
+        foreach ($keys as $key) {
+            $out[] = $this->liveValue((string) $key);
+        }
+        return $out;
+    }
+
+    public function mset(array $values, int $ttlSeconds = 0): bool
+    {
+        foreach ($values as $key => $value) {
+            $this->set((string) $key, (string) $value, $ttlSeconds);
+        }
+        return true;
+    }
 
     public function get(string $key): ?string
     {

@@ -69,7 +69,11 @@ single C function call per `get`/`set` is the upside.
 - **`symfony/cache` ^6.4 || ^7.0** (Composer pulls this in automatically)
 - **The ePHPm runtime** — any tagged release works (every `ephpm_kv_*`
   SAPI function this adapter calls has shipped since ePHPm v0.1.0;
-  current release: v0.10.2). The functions are
+  current release: v0.10.2). On ePHPm **v0.13.0+** multi-item reads and
+  writes (`getItems()`, `commit()`) use one `ephpm_kv_mget` /
+  `ephpm_kv_mset` call per batch instead of one call per key; both are
+  feature-detected with `function_exists()`, so older runtimes keep the
+  per-key path. The functions are
   registered by ePHPm's embedded PHP. If you're running your code under
   PHP-FPM, Apache mod_php, or the stock PHP CLI, those functions don't
   exist and `SapiKvOps::__construct()` throws on instantiation. For
@@ -349,8 +353,8 @@ If this passes you've confirmed:
 
 | Operation                                        | Status / notes                                                          |
 | ------------------------------------------------ | ----------------------------------------------------------------------- |
-| `getItem` / `getItems` / `hasItem`               | Supported.                                                              |
-| `save` / `saveDeferred` / `commit`               | Supported. TTL respects `$item->expiresAfter()` / `expiresAt()`, falling back to the adapter's `defaultLifetime`. |
+| `getItem` / `getItems` / `hasItem`               | Supported. `getItems()` is one `ephpm_kv_mget` call on ePHPm v0.13+. |
+| `save` / `saveDeferred` / `commit`               | Supported. TTL respects `$item->expiresAfter()` / `expiresAt()`, falling back to the adapter's `defaultLifetime`. On ePHPm v0.13+ each batch of items sharing a lifetime is one `ephpm_kv_mset` call; if it is refused (memory limit) the batch is retried key by key so the exact failed items are reported. |
 | `deleteItem` / `deleteItems`                     | Supported.                                                              |
 | `get($key, $callback)` (Contracts)               | Supported (including stampede protection via `LockRegistry`).           |
 | `clear()`                                        | **Un-namespaced adapter only**: flushes the whole store via `ephpm_kv_flush_all()` (ePHPm v0.1.2+). With a namespace it returns `false` — see Limitations. |
@@ -362,9 +366,13 @@ If this passes you've confirmed:
 ## Limitations
 
 **`clear()` on a namespaced adapter is a no-op (returns `false`).**
-The ePHPm KV SAPI doesn't expose key enumeration — there's no `SCAN`, no
-`KEYS`, no namespace-prefix iteration — so a namespace-scoped clear
-cannot delete just its own keys. An **un-namespaced** adapter
+A namespace-scoped clear needs to enumerate the namespace's keys. ePHPm
+before v0.13 has no key enumeration at all. v0.13 adds `ephpm_kv_scan`,
+but it is deliberately **not** used here: in a cluster it lists only the
+local node's keyspace — string values larger than `[cluster.kv]
+small_key_threshold` (typical for serialized cache items) live only on
+their replica nodes — so a scan-and-delete clear could report success
+while leaving stale entries on other nodes. An **un-namespaced** adapter
 (`new EphpmKvAdapter('')`) falls back to a global
 `ephpm_kv_flush_all()` (ePHPm v0.1.2+), the same contract as
 `RedisAdapter`'s `FLUSHDB` fallback — note that flushes *everything* in
@@ -388,7 +396,7 @@ invalidation, wrap this adapter with Symfony's `TagAwareAdapter`, which
 maintains its own tag-to-key index in a second pool. The tag pool can
 also be an `EphpmKvAdapter` instance.
 
-**No `SCAN`, so key enumeration tools won't work.**
+**No key enumeration, so key enumeration tools won't work.**
 Cache stampede protection via `LockRegistry` works fine because it only
 needs read/write of single, well-known lock keys. But anything that
 wants to walk the keyspace (custom invalidators, debug dumps,
@@ -415,7 +423,9 @@ assert($cache->getItem('foo')->get() === 'bar');
 
 `InMemoryKvOps` is for tests only — values live in PHP arrays, there is
 no eviction policy, no memory limit, and TTL is best-effort lazy
-expiry. Don't use it in production.
+expiry. Don't use it in production. It implements the v0.13 multi-key
+operations too; `new InMemoryKvOps([])` behaves like an older ePHPm
+without them.
 
 ---
 
@@ -431,7 +441,8 @@ the third arg of `EphpmKvAdapter` (tests).
 
 You're calling `clear()` on a **namespaced** adapter and expecting it to
 nuke the pool. It doesn't — a namespaced `clear()` returns `false`
-because the SAPI has no `SCAN` to delete by prefix. Either use an
+because there is no cluster-safe way to delete by prefix (see
+[Limitations](#limitations)). Either use an
 un-namespaced adapter (whose `clear()` flushes the whole store via
 `ephpm_kv_flush_all()`), or switch to
 **namespace versioning**: change the namespace string passed to
