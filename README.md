@@ -69,7 +69,7 @@ single C function call per `get`/`set` is the upside.
 - **`symfony/cache` ^6.4 || ^7.0** (Composer pulls this in automatically)
 - **The ePHPm runtime** — any tagged release works (every `ephpm_kv_*`
   SAPI function this adapter calls has shipped since ePHPm v0.1.0;
-  current release: v0.10.2). On ePHPm **v0.13.0+** multi-item reads and
+  see the [ePHPm releases](https://github.com/ephpm/ephpm/releases) for the latest version). On ePHPm **v0.13.0+** multi-item reads and
   writes (`getItems()`, `commit()`) use one `ephpm_kv_mget` /
   `ephpm_kv_mset` call per batch instead of one call per key; both are
   feature-detected with `function_exists()`, so older runtimes keep the
