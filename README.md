@@ -95,12 +95,12 @@ refuse to construct.
 
 ePHPm packages are distributed via their GitHub repositories, not
 Packagist. Add this repo as a Composer `vcs` repository, then require
-the package (`ephpm/cache-symfony` is tagged `v0.1.0`, so `^0.1`
+the package (`ephpm/cache-symfony` is tagged `v0.2.0`, so `^0.2`
 resolves):
 
 ```bash
 composer config repositories.ephpm/cache-symfony vcs https://github.com/ephpm/cache-symfony
-composer require ephpm/cache-symfony:^0.1
+composer require ephpm/cache-symfony:^0.2
 ```
 
 That's it. Composer pulls in `symfony/cache` if you don't already have it.
@@ -111,7 +111,7 @@ If you're starting a brand-new project from scratch:
 mkdir my-app && cd my-app
 composer init --no-interaction --name=acme/my-app --require=php:^8.2
 composer config repositories.ephpm/cache-symfony vcs https://github.com/ephpm/cache-symfony
-composer require ephpm/cache-symfony:^0.1
+composer require ephpm/cache-symfony:^0.2
 ```
 
 ---
@@ -143,7 +143,7 @@ my-app/
     ],
     "require": {
         "php": "^8.2",
-        "ephpm/cache-symfony": "^0.1"
+        "ephpm/cache-symfony": "^0.2"
     }
 }
 ```
